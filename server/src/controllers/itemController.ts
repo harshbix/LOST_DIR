@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import Item from '../models/Item';
+import { ObjectId } from 'mongodb';
+import { getDb } from '../config/db';
 
 interface AuthRequest extends Request {
     user?: any;
@@ -8,16 +9,22 @@ interface AuthRequest extends Request {
 export const createItem = async (req: AuthRequest, res: Response) => {
     try {
         const { title, description, category, status, location, imageUrl } = req.body;
-        const item = await Item.create({
+        const db = getDb();
+
+        const result = await db.collection('items').insertOne({
             title,
             description,
             category,
             status,
             location,
             imageUrl,
-            owner: req.user.id,
+            owner: new ObjectId(req.user.id),
+            state: 'active',
+            createdAt: new Date(),
+            updatedAt: new Date(),
         });
-        res.status(201).json(item);
+
+        res.status(201).json({ _id: result.insertedId, ...req.body });
     } catch (error) {
         res.status(500).json({ message: (error as Error).message });
     }
@@ -37,8 +44,34 @@ export const getItems = async (req: Request, res: Response) => {
             ];
         }
 
-        const items = await Item.find(query).sort({ createdAt: -1 }).populate('owner', 'name email');
-        res.json(items);
+        const db = getDb();
+        const items = await db.collection('items')
+            .aggregate([
+                { $match: query },
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'owner',
+                        foreignField: '_id',
+                        as: 'ownerInfo'
+                    }
+                },
+                { $unwind: '$ownerInfo' },
+                {
+                    $project: {
+                        'ownerInfo.password': 0,
+                    }
+                },
+                { $sort: { createdAt: -1 } }
+            ]).toArray();
+
+        // Map ownerInfo to owner to match client expectation
+        const formattedItems = items.map(item => ({
+            ...item,
+            owner: item.ownerInfo
+        }));
+
+        res.json(formattedItems);
     } catch (error) {
         res.status(500).json({ message: (error as Error).message });
     }
@@ -46,9 +79,28 @@ export const getItems = async (req: Request, res: Response) => {
 
 export const getItemById = async (req: Request, res: Response) => {
     try {
-        const item = await Item.findById(req.params.id).populate('owner', 'name email');
-        if (item) {
-            res.json(item);
+        const db = getDb();
+        const item = await db.collection('items')
+            .aggregate([
+                { $match: { _id: new ObjectId(req.params.id) } },
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'owner',
+                        foreignField: '_id',
+                        as: 'ownerInfo'
+                    }
+                },
+                { $unwind: '$ownerInfo' },
+                {
+                    $project: {
+                        'ownerInfo.password': 0,
+                    }
+                }
+            ]).toArray();
+
+        if (item.length > 0) {
+            res.json({ ...item[0], owner: item[0].ownerInfo });
         } else {
             res.status(404).json({ message: 'Item not found' });
         }
@@ -59,14 +111,23 @@ export const getItemById = async (req: Request, res: Response) => {
 
 export const updateItemStatus = async (req: AuthRequest, res: Response) => {
     try {
-        const item = await Item.findById(req.params.id);
+        const db = getDb();
+        const collection = db.collection('items');
+
+        const item = await collection.findOne({ _id: new ObjectId(req.params.id) });
+
         if (item) {
             if (item.owner.toString() !== req.user.id) {
                 return res.status(401).json({ message: 'User not authorized' });
             }
-            item.state = req.body.state || item.state;
-            const updatedItem = await item.save();
-            res.json(updatedItem);
+
+            const updatedState = req.body.state || item.state;
+            await collection.updateOne(
+                { _id: new ObjectId(req.params.id) },
+                { $set: { state: updatedState, updatedAt: new Date() } }
+            );
+
+            res.json({ ...item, state: updatedState });
         } else {
             res.status(404).json({ message: 'Item not found' });
         }
@@ -77,7 +138,11 @@ export const updateItemStatus = async (req: AuthRequest, res: Response) => {
 
 export const getMyItems = async (req: AuthRequest, res: Response) => {
     try {
-        const items = await Item.find({ owner: req.user.id }).sort({ createdAt: -1 });
+        const db = getDb();
+        const items = await db.collection('items')
+            .find({ owner: new ObjectId(req.user.id) })
+            .sort({ createdAt: -1 })
+            .toArray();
         res.json(items);
     } catch (error) {
         res.status(500).json({ message: (error as Error).message });

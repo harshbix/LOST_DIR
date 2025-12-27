@@ -20,7 +20,7 @@ A full-stack application for the community to report and find lost items.
 ### Server
 - Node.js (Express)
 - TypeScript
-- MongoDB (Mongoose)
+- MongoDB (Native Driver)
 - JWT for Authentication
 - Bcrypt for password hashing
 
@@ -42,7 +42,8 @@ A full-stack application for the community to report and find lost items.
 3. Create a `.env` file in the `server` directory:
    ```env
    PORT=5000
-   MONGODB_URI=mongodb://localhost:27017/lostfound
+   # Use your Atlas URI or local MongoDB URI
+   MONGODB_URI=mongodb+srv://admin:gFVj73zOFWK7g2uk@cluster0.mongodb.net/lostfound
    JWT_SECRET=your_secret_key
    ```
 4. Start the development server:
@@ -67,12 +68,10 @@ A full-stack application for the community to report and find lost items.
 
 ## Environment Variables
 - `PORT`: Server port (default: 5000)
-- `MONGODB_URI`: MongoDB connection string
+- `MONGODB_URI`: MongoDB connection string (Native Driver format)
 - `JWT_SECRET`: Secret key for JWT signing
 
 ## Run Commands
 - `npm run dev` (Server): Starts development server with ts-node-dev.
 - `npm run build` (Server): Compiles TypeScript to JavaScript.
 - `npx expo start` (Client): Starts the Expo development server.
-
-gFVj73zOFWK7g2uk
