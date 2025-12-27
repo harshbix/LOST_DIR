@@ -1,11 +1,30 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+    StyleSheet,
+    View,
+    ScrollView,
+    TouchableOpacity,
+    ActivityIndicator,
+    Alert,
+    Image,
+    Dimensions,
+    Platform
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { getItemById, updateItemStatus } from '@/services/itemService';
+import { getItemById, updateItemStatus, deleteItem } from '@/services/itemService';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useThemeColor } from '@/hooks/use-theme-color';
+import { Colors } from '@/constants/theme';
+import { BlurView } from 'expo-blur';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+
+const { width } = Dimensions.get('window');
 
 export default function ItemDetailsScreen() {
     const { id } = useLocalSearchParams();
@@ -13,8 +32,14 @@ export default function ItemDetailsScreen() {
     const [loading, setLoading] = useState(true);
     const { user } = useAuth();
     const router = useRouter();
+    const colorScheme = useColorScheme() ?? 'light';
 
-    const fetchItem = async () => {
+    const cardColor = useThemeColor({}, 'card');
+    const borderColor = useThemeColor({}, 'border');
+    const secondaryText = useThemeColor({}, 'secondaryText');
+    const tintColor = useThemeColor({}, 'tint');
+
+    const fetchItem = useCallback(async () => {
         try {
             const data = await getItemById(id as string);
             setItem(data);
@@ -25,56 +50,88 @@ export default function ItemDetailsScreen() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [id, router]);
 
     useEffect(() => {
         fetchItem();
-    }, [id]);
+    }, [fetchItem]);
 
     const handleUpdateStatus = async (newState: string) => {
         try {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             await updateItemStatus(id as string, newState);
             fetchItem();
-            Alert.alert('Success', `Item marked as ${newState}`);
+            Alert.alert('Status Updated', `Item is now marked as ${newState}`);
         } catch (error) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             Alert.alert('Error', 'Failed to update status');
         }
+    };
+
+    const handleDelete = async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Alert.alert(
+            'Delete Post',
+            'Are you sure you want to delete this listing permanently?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteItem(id as string);
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            router.replace('/(tabs)');
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to delete post');
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     if (loading) {
         return (
             <ThemedView style={styles.center}>
-                <ActivityIndicator size="large" color="#007AFF" />
+                <ActivityIndicator size="large" color={tintColor} />
             </ThemedView>
         );
     }
 
     if (!item) return null;
 
-    const isOwner = user && user._id === item.owner?._id;
+    const isOwner = user && user._id === (item.owner?._id || item.owner);
     const isRecovered = item.state === 'recovered' || item.state === 'returned';
 
     return (
         <ThemedView style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-                {item.imageUrl ? (
-                    <Image source={{ uri: item.imageUrl }} style={styles.headerImage} />
-                ) : (
-                    <View style={styles.imagePlaceholder}>
-                        <Ionicons
-                            name={item.status === 'lost' ? 'help-circle' : 'search-circle'}
-                            size={100}
-                            color="#D1D1D6"
-                        />
-                    </View>
-                )}
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+            >
+                <Animated.View entering={FadeIn}>
+                    {item.imageUrl ? (
+                        <Image source={{ uri: item.imageUrl }} style={styles.headerImage} resizeMode="cover" />
+                    ) : (
+                        <View style={[styles.imagePlaceholder, { backgroundColor: cardColor }]}>
+                            <Ionicons
+                                name={item.status === 'lost' ? 'help-circle' : 'search-circle'}
+                                size={120}
+                                color={borderColor}
+                            />
+                            <ThemedText style={[styles.noImageText, { color: secondaryText }]}>No image provided</ThemedText>
+                        </View>
+                    )}
+                </Animated.View>
 
-                <View style={styles.content}>
+                <Animated.View entering={FadeInDown.delay(200)} style={[styles.content, { backgroundColor: useThemeColor({}, 'background') }]}>
                     <View style={styles.badgeRow}>
-                        <View style={[styles.badge, { backgroundColor: item.status === 'lost' ? '#FF3B30' : '#34C759' }]}>
+                        <View style={[styles.badge, { backgroundColor: item.status === 'lost' ? '#FF453A' : '#32D74B' }]}>
                             <ThemedText style={styles.badgeText}>{item.status.toUpperCase()}</ThemedText>
                         </View>
-                        <View style={[styles.stateBadge, isRecovered && styles.completeBadge]}>
+                        <View style={[styles.stateBadge, { backgroundColor: cardColor }, isRecovered && styles.completeBadge]}>
                             <ThemedText style={[styles.stateText, isRecovered && styles.completeText]}>
                                 {item.state.toUpperCase()}
                             </ThemedText>
@@ -83,75 +140,123 @@ export default function ItemDetailsScreen() {
 
                     <ThemedText type="title" style={styles.title}>{item.title}</ThemedText>
 
-                    <View style={styles.infoRow}>
+                    <View style={styles.infoGrid}>
                         <View style={styles.infoItem}>
-                            <Ionicons name="pricetag-outline" size={16} color="#007AFF" />
-                            <ThemedText style={styles.infoValue}>{item.category}</ThemedText>
-                        </View>
-                        <View style={styles.infoItem}>
-                            <Ionicons name="location-outline" size={16} color="#007AFF" />
-                            <ThemedText style={styles.infoValue}>{item.location}</ThemedText>
-                        </View>
-                    </View>
-
-                    <View style={styles.section}>
-                        <ThemedText style={styles.sectionTitle}>Description</ThemedText>
-                        <ThemedText style={styles.description}>{item.description}</ThemedText>
-                    </View>
-
-                    <View style={styles.section}>
-                        <ThemedText style={styles.sectionTitle}>Posted By</ThemedText>
-                        <View style={styles.ownerCard}>
-                            <View style={styles.ownerAvatar}>
-                                <ThemedText style={styles.avatarText}>{item.owner?.name?.charAt(0).toUpperCase()}</ThemedText>
+                            <View style={[styles.infoIcon, { backgroundColor: tintColor + '15' }]}>
+                                <Ionicons name="pricetag" size={18} color={tintColor} />
                             </View>
                             <View>
-                                <ThemedText style={styles.ownerName}>{item.owner?.name}</ThemedText>
-                                <ThemedText style={styles.ownerContact}>{item.owner?.email}</ThemedText>
+                                <ThemedText style={[styles.infoLabel, { color: secondaryText }]}>Category</ThemedText>
+                                <ThemedText style={styles.infoValue}>{item.category}</ThemedText>
+                            </View>
+                        </View>
+                        <View style={styles.infoItem}>
+                            <View style={[styles.infoIcon, { backgroundColor: tintColor + '15' }]}>
+                                <Ionicons name="location" size={18} color={tintColor} />
+                            </View>
+                            <View>
+                                <ThemedText style={[styles.infoLabel, { color: secondaryText }]}>Location</ThemedText>
+                                <ThemedText style={styles.infoValue}>{item.location}</ThemedText>
+                            </View>
+                        </View>
+                        <View style={styles.infoItem}>
+                            <View style={[styles.infoIcon, { backgroundColor: tintColor + '15' }]}>
+                                <Ionicons name="calendar" size={18} color={tintColor} />
+                            </View>
+                            <View>
+                                <ThemedText style={[styles.infoLabel, { color: secondaryText }]}>Posted On</ThemedText>
+                                <ThemedText style={styles.infoValue}>
+                                    {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </ThemedText>
                             </View>
                         </View>
                     </View>
-                </View>
+
+                    <View style={[styles.sectionDivider, { backgroundColor: borderColor }]} />
+
+                    <View style={styles.section}>
+                        <ThemedText style={styles.sectionTitle}>Details</ThemedText>
+                        <ThemedText style={[styles.description, { color: useThemeColor({}, 'text') }]}>{item.description}</ThemedText>
+                    </View>
+
+                    <View style={[styles.sectionDivider, { backgroundColor: borderColor }]} />
+
+                    <View style={styles.section}>
+                        <ThemedText style={styles.sectionTitle}>Owner Information</ThemedText>
+                        <View style={[styles.ownerCard, { backgroundColor: cardColor }]}>
+                            <View style={[styles.ownerAvatar, { backgroundColor: tintColor }]}>
+                                <ThemedText style={styles.avatarText}>{item.owner?.name?.charAt(0).toUpperCase() || '?'}</ThemedText>
+                            </View>
+                            <View style={styles.ownerInfo}>
+                                <ThemedText style={styles.ownerName}>{item.owner?.name || 'User'}</ThemedText>
+                                <ThemedText style={[styles.ownerContact, { color: secondaryText }]}>{item.owner?.email || 'No contact provided'}</ThemedText>
+                            </View>
+                        </View>
+                    </View>
+                </Animated.View>
             </ScrollView>
 
-            <View style={styles.footer}>
-                {isOwner ? (
-                    <View style={styles.ownerActions}>
-                        {!isRecovered ? (
-                            <TouchableOpacity
-                                style={styles.button}
-                                onPress={() => handleUpdateStatus(item.status === 'lost' ? 'recovered' : 'returned')}
-                            >
-                                <ThemedText style={styles.buttonText}>
-                                    {item.status === 'lost' ? 'Mark as Recovered' : 'Mark as Returned'}
-                                </ThemedText>
-                            </TouchableOpacity>
+            <View style={styles.footerWrapper}>
+                {Platform.OS === 'ios' && (
+                    <BlurView intensity={80} tint={colorScheme} style={StyleSheet.absoluteFill} />
+                )}
+                <SafeAreaView edges={['bottom']} style={[styles.footer, Platform.OS !== 'ios' && { backgroundColor: cardColor }]}>
+                    <Animated.View entering={FadeInDown.delay(400)} style={styles.footerContent}>
+                        {isOwner ? (
+                            <View style={styles.ownerActions}>
+                                {!isRecovered ? (
+                                    <TouchableOpacity
+                                        activeOpacity={0.8}
+                                        style={[styles.primaryButton, { backgroundColor: tintColor }]}
+                                        onPress={() => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            handleUpdateStatus(item.status === 'lost' ? 'recovered' : 'returned');
+                                        }}
+                                    >
+                                        <Ionicons name="checkmark-done" size={20} color="#FFF" />
+                                        <ThemedText style={styles.buttonText}>
+                                            {item.status === 'lost' ? 'Mark Recovered' : 'Mark Returned'}
+                                        </ThemedText>
+                                    </TouchableOpacity>
+                                ) : (
+                                    <TouchableOpacity
+                                        activeOpacity={0.8}
+                                        style={[styles.primaryButton, { backgroundColor: borderColor }]}
+                                        onPress={() => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            handleUpdateStatus('active');
+                                        }}
+                                    >
+                                        <Ionicons name="refresh" size={20} color={tintColor} />
+                                        <ThemedText style={[styles.secondaryButtonText, { color: tintColor }]}>Re-activate Post</ThemedText>
+                                    </TouchableOpacity>
+                                )}
+                                <TouchableOpacity
+                                    activeOpacity={0.8}
+                                    style={styles.dangerButton}
+                                    onPress={handleDelete}
+                                >
+                                    <Ionicons name="trash" size={24} color="#FFF" />
+                                </TouchableOpacity>
+                            </View>
                         ) : (
                             <TouchableOpacity
-                                style={[styles.button, styles.secondaryButton]}
-                                onPress={() => handleUpdateStatus('active')}
+                                activeOpacity={0.8}
+                                style={[styles.primaryButton, { backgroundColor: tintColor }, isRecovered && styles.disabledButton]}
+                                disabled={isRecovered}
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                    Alert.alert('Contact Owner', `You can reach ${item.owner?.name} at ${item.owner?.email}`);
+                                }}
                             >
-                                <ThemedText style={styles.secondaryButtonText}>Re-activate Post</ThemedText>
+                                <Ionicons name="mail" size={20} color="#FFF" />
+                                <ThemedText style={styles.buttonText}>
+                                    {isRecovered ? 'Item Case Closed' : 'Contact Owner'}
+                                </ThemedText>
                             </TouchableOpacity>
                         )}
-                        <TouchableOpacity
-                            style={[styles.button, styles.dangerButton]}
-                            onPress={() => Alert.alert('Delete', 'This feature is coming soon!')}
-                        >
-                            <Ionicons name="trash-outline" size={24} color="#FFF" />
-                        </TouchableOpacity>
-                    </View>
-                ) : (
-                    <TouchableOpacity
-                        style={[styles.button, isRecovered && styles.disabledButton]}
-                        disabled={isRecovered}
-                        onPress={() => Alert.alert('Contact', `Contact ${item.owner?.name} at ${item.owner?.email}`)}
-                    >
-                        <ThemedText style={styles.buttonText}>
-                            {isRecovered ? 'Item Case Closed' : 'Contact Owner'}
-                        </ThemedText>
-                    </TouchableOpacity>
-                )}
+                    </Animated.View>
+                </SafeAreaView>
             </View>
         </ThemedView>
     );
@@ -161,166 +266,208 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    scrollContent: {
+        paddingBottom: 140,
+    },
     center: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
     },
     headerImage: {
-        width: '100%',
-        height: 300,
-        backgroundColor: '#F2F2F7',
+        width: width,
+        height: width * 0.9,
     },
     imagePlaceholder: {
-        height: 250,
-        backgroundColor: '#F2F2F7',
+        width: width,
+        height: 320,
         justifyContent: 'center',
         alignItems: 'center',
     },
+    noImageText: {
+        marginTop: 8,
+        fontWeight: '600',
+    },
     content: {
-        padding: 20,
-        gap: 16,
+        padding: 24,
+        marginTop: -32,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
     },
     badgeRow: {
         flexDirection: 'row',
-        gap: 8,
+        gap: 12,
+        marginBottom: 20,
     },
     badge: {
         paddingHorizontal: 12,
-        paddingVertical: 5,
-        borderRadius: 8,
+        paddingVertical: 6,
+        borderRadius: 10,
     },
     badgeText: {
         color: '#FFF',
         fontSize: 12,
-        fontWeight: 'bold',
+        fontWeight: '900',
+        letterSpacing: 1,
     },
     stateBadge: {
         paddingHorizontal: 12,
-        paddingVertical: 5,
-        borderRadius: 8,
-        backgroundColor: '#E5E5EA',
+        paddingVertical: 6,
+        borderRadius: 10,
     },
     completeBadge: {
-        backgroundColor: '#34C75920',
+        backgroundColor: '#32D74B15',
         borderWidth: 1,
-        borderColor: '#34C759',
+        borderColor: '#32D74B',
     },
     stateText: {
         fontSize: 12,
-        fontWeight: 'bold',
-        color: '#3A3A3C',
+        fontWeight: '800',
+        textTransform: 'uppercase',
     },
     completeText: {
-        color: '#34C759',
+        color: '#32D74B',
     },
     title: {
-        fontSize: 28,
+        fontSize: 32,
+        fontWeight: '900',
+        marginBottom: 24,
     },
-    infoRow: {
+    infoGrid: {
         flexDirection: 'row',
-        gap: 12,
         flexWrap: 'wrap',
+        gap: 20,
+        marginBottom: 24,
     },
     infoItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        backgroundColor: '#F2F2F7',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderRadius: 12,
+        gap: 12,
+        minWidth: '45%',
+    },
+    infoIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    infoLabel: {
+        fontSize: 12,
+        fontWeight: '700',
     },
     infoValue: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#3A3A3C',
+        fontSize: 15,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+    sectionDivider: {
+        height: 1,
+        marginVertical: 24,
     },
     section: {
-        marginTop: 10,
-        gap: 8,
+        gap: 12,
     },
     sectionTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#8E8E93',
+        fontSize: 20,
+        fontWeight: '800',
     },
     description: {
         fontSize: 16,
-        lineHeight: 24,
-        color: '#3A3A3C',
+        lineHeight: 26,
+        fontWeight: '500',
     },
     ownerCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        backgroundColor: '#F2F2F7',
+        gap: 16,
         padding: 16,
-        borderRadius: 16,
+        borderRadius: 22,
     },
     ownerAvatar: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: '#007AFF',
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
     },
     avatarText: {
         color: '#FFF',
-        fontWeight: 'bold',
-        fontSize: 20,
+        fontWeight: '800',
+        fontSize: 24,
+    },
+    ownerInfo: {
+        flex: 1,
     },
     ownerName: {
-        fontWeight: '600',
-        fontSize: 16,
-        color: '#000',
+        fontWeight: '800',
+        fontSize: 18,
     },
     ownerContact: {
         fontSize: 14,
-        color: '#8E8E93',
+        fontWeight: '500',
         marginTop: 2,
     },
+    footerWrapper: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        overflow: 'hidden',
+    },
     footer: {
-        padding: 20,
-        paddingBottom: 40,
-        borderTopWidth: 1,
-        borderTopColor: '#F2F2F7',
-        backgroundColor: '#FFF',
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: 'rgba(142, 142, 147, 0.2)',
+    },
+    footerContent: {
+        padding: 24,
     },
     ownerActions: {
         flexDirection: 'row',
         gap: 12,
     },
-    button: {
+    primaryButton: {
         flex: 1,
-        backgroundColor: '#007AFF',
-        height: 56,
-        borderRadius: 16,
+        height: 64,
+        borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
         flexDirection: 'row',
-        gap: 8,
+        gap: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.15,
+        shadowRadius: 16,
+        elevation: 6,
+    },
+    secondaryButtonText: {
+        fontSize: 16,
+        fontWeight: '800',
     },
     buttonText: {
         color: '#FFF',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    secondaryButton: {
-        backgroundColor: '#F2F2F7',
-    },
-    secondaryButtonText: {
-        color: '#007AFF',
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 17,
+        fontWeight: '800',
     },
     dangerButton: {
-        backgroundColor: '#FF3B30',
-        width: 56,
-        flex: 0,
+        backgroundColor: '#FF453A',
+        width: 64,
+        height: 64,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#FF453A',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.2,
+        shadowRadius: 16,
+        elevation: 6,
     },
     disabledButton: {
-        backgroundColor: '#C7C7CC',
+        backgroundColor: '#3A3A3C',
+        shadowOpacity: 0,
     },
 });

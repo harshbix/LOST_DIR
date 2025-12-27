@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import connectDB from './config/db';
 import authRoutes from './routes/auth';
 import itemRoutes from './routes/item';
+import locationRoutes from './routes/location';
 import { notFound, errorHandler } from './middlewares/errorMiddleware';
 
 dotenv.config();
@@ -37,6 +38,7 @@ app.use((req, res, next) => {
 // Routes
 app.use('/auth', authRoutes);
 app.use('/items', itemRoutes);
+app.use('/locations', locationRoutes);
 
 app.get('/', (req, res) => {
     res.send('Lost & Found API is running...');

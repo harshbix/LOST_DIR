@@ -24,3 +24,8 @@ export const updateItemStatus = async (id: string, state: string) => {
     const response = await api.patch(`/items/${id}/status`, { state });
     return response.data;
 };
+
+export const deleteItem = async (id: string) => {
+    const response = await api.delete(`/items/${id}`);
+    return response.data;
+};
