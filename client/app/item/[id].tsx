@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -52,25 +52,32 @@ export default function ItemDetailsScreen() {
     if (!item) return null;
 
     const isOwner = user && user._id === item.owner?._id;
+    const isRecovered = item.state === 'recovered' || item.state === 'returned';
 
     return (
         <ThemedView style={styles.container}>
-            <ScrollView>
-                <View style={styles.imagePlaceholder}>
-                    <Ionicons
-                        name={item.status === 'lost' ? 'help-circle' : 'search-circle'}
-                        size={100}
-                        color="#D1D1D6"
-                    />
-                </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+                {item.imageUrl ? (
+                    <Image source={{ uri: item.imageUrl }} style={styles.headerImage} />
+                ) : (
+                    <View style={styles.imagePlaceholder}>
+                        <Ionicons
+                            name={item.status === 'lost' ? 'help-circle' : 'search-circle'}
+                            size={100}
+                            color="#D1D1D6"
+                        />
+                    </View>
+                )}
 
                 <View style={styles.content}>
                     <View style={styles.badgeRow}>
                         <View style={[styles.badge, { backgroundColor: item.status === 'lost' ? '#FF3B30' : '#34C759' }]}>
                             <ThemedText style={styles.badgeText}>{item.status.toUpperCase()}</ThemedText>
                         </View>
-                        <View style={styles.stateBadge}>
-                            <ThemedText style={styles.stateText}>{item.state.toUpperCase()}</ThemedText>
+                        <View style={[styles.stateBadge, isRecovered && styles.completeBadge]}>
+                            <ThemedText style={[styles.stateText, isRecovered && styles.completeText]}>
+                                {item.state.toUpperCase()}
+                            </ThemedText>
                         </View>
                     </View>
 
@@ -96,7 +103,7 @@ export default function ItemDetailsScreen() {
                         <ThemedText style={styles.sectionTitle}>Posted By</ThemedText>
                         <View style={styles.ownerCard}>
                             <View style={styles.ownerAvatar}>
-                                <ThemedText style={styles.avatarText}>{item.owner?.name?.charAt(0)}</ThemedText>
+                                <ThemedText style={styles.avatarText}>{item.owner?.name?.charAt(0).toUpperCase()}</ThemedText>
                             </View>
                             <View>
                                 <ThemedText style={styles.ownerName}>{item.owner?.name}</ThemedText>
@@ -110,25 +117,39 @@ export default function ItemDetailsScreen() {
             <View style={styles.footer}>
                 {isOwner ? (
                     <View style={styles.ownerActions}>
+                        {!isRecovered ? (
+                            <TouchableOpacity
+                                style={styles.button}
+                                onPress={() => handleUpdateStatus(item.status === 'lost' ? 'recovered' : 'returned')}
+                            >
+                                <ThemedText style={styles.buttonText}>
+                                    {item.status === 'lost' ? 'Mark as Recovered' : 'Mark as Returned'}
+                                </ThemedText>
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity
+                                style={[styles.button, styles.secondaryButton]}
+                                onPress={() => handleUpdateStatus('active')}
+                            >
+                                <ThemedText style={styles.secondaryButtonText}>Re-activate Post</ThemedText>
+                            </TouchableOpacity>
+                        )}
                         <TouchableOpacity
-                            style={[styles.button, styles.secondaryButton]}
-                            onPress={() => handleUpdateStatus('recovered')}
+                            style={[styles.button, styles.dangerButton]}
+                            onPress={() => Alert.alert('Delete', 'This feature is coming soon!')}
                         >
-                            <ThemedText style={styles.secondaryButtonText}>Mark Recovered</ThemedText>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.button}
-                            onPress={() => handleUpdateStatus('returned')}
-                        >
-                            <ThemedText style={styles.buttonText}>Mark Returned</ThemedText>
+                            <Ionicons name="trash-outline" size={24} color="#FFF" />
                         </TouchableOpacity>
                     </View>
                 ) : (
                     <TouchableOpacity
-                        style={styles.button}
+                        style={[styles.button, isRecovered && styles.disabledButton]}
+                        disabled={isRecovered}
                         onPress={() => Alert.alert('Contact', `Contact ${item.owner?.name} at ${item.owner?.email}`)}
                     >
-                        <ThemedText style={styles.buttonText}>Contact Owner</ThemedText>
+                        <ThemedText style={styles.buttonText}>
+                            {isRecovered ? 'Item Case Closed' : 'Contact Owner'}
+                        </ThemedText>
                     </TouchableOpacity>
                 )}
             </View>
@@ -144,6 +165,11 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    headerImage: {
+        width: '100%',
+        height: 300,
+        backgroundColor: '#F2F2F7',
     },
     imagePlaceholder: {
         height: 250,
@@ -161,7 +187,7 @@ const styles = StyleSheet.create({
     },
     badge: {
         paddingHorizontal: 12,
-        paddingVertical: 4,
+        paddingVertical: 5,
         borderRadius: 8,
     },
     badgeText: {
@@ -171,21 +197,29 @@ const styles = StyleSheet.create({
     },
     stateBadge: {
         paddingHorizontal: 12,
-        paddingVertical: 4,
+        paddingVertical: 5,
         borderRadius: 8,
         backgroundColor: '#E5E5EA',
+    },
+    completeBadge: {
+        backgroundColor: '#34C75920',
+        borderWidth: 1,
+        borderColor: '#34C759',
     },
     stateText: {
         fontSize: 12,
         fontWeight: 'bold',
         color: '#3A3A3C',
     },
+    completeText: {
+        color: '#34C759',
+    },
     title: {
         fontSize: 28,
     },
     infoRow: {
         flexDirection: 'row',
-        gap: 16,
+        gap: 12,
         flexWrap: 'wrap',
     },
     infoItem: {
@@ -194,12 +228,13 @@ const styles = StyleSheet.create({
         gap: 6,
         backgroundColor: '#F2F2F7',
         paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 10,
+        paddingVertical: 10,
+        borderRadius: 12,
     },
     infoValue: {
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '600',
+        color: '#3A3A3C',
     },
     section: {
         marginTop: 10,
@@ -208,25 +243,25 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        opacity: 0.5,
+        color: '#8E8E93',
     },
     description: {
         fontSize: 16,
         lineHeight: 24,
-        opacity: 0.8,
+        color: '#3A3A3C',
     },
     ownerCard: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
         backgroundColor: '#F2F2F7',
-        padding: 12,
+        padding: 16,
         borderRadius: 16,
     },
     ownerAvatar: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         backgroundColor: '#007AFF',
         justifyContent: 'center',
         alignItems: 'center',
@@ -234,15 +269,17 @@ const styles = StyleSheet.create({
     avatarText: {
         color: '#FFF',
         fontWeight: 'bold',
-        fontSize: 18,
+        fontSize: 20,
     },
     ownerName: {
         fontWeight: '600',
         fontSize: 16,
+        color: '#000',
     },
     ownerContact: {
         fontSize: 14,
-        opacity: 0.5,
+        color: '#8E8E93',
+        marginTop: 2,
     },
     footer: {
         padding: 20,
@@ -253,7 +290,7 @@ const styles = StyleSheet.create({
     },
     ownerActions: {
         flexDirection: 'row',
-        gap: 10,
+        gap: 12,
     },
     button: {
         flex: 1,
@@ -262,11 +299,13 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
+        flexDirection: 'row',
+        gap: 8,
     },
     buttonText: {
         color: '#FFF',
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: 'bold',
     },
     secondaryButton: {
         backgroundColor: '#F2F2F7',
@@ -274,6 +313,14 @@ const styles = StyleSheet.create({
     secondaryButtonText: {
         color: '#007AFF',
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: 'bold',
+    },
+    dangerButton: {
+        backgroundColor: '#FF3B30',
+        width: 56,
+        flex: 0,
+    },
+    disabledButton: {
+        backgroundColor: '#C7C7CC',
     },
 });

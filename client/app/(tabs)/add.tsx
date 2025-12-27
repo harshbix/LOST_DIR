@@ -1,10 +1,22 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { createItem } from '@/services/itemService';
 import { Ionicons } from '@expo/vector-icons';
+
+const CATEGORIES = [
+    'Electronics',
+    'Keys',
+    'Wallet/ID',
+    'Clothing',
+    'Pets',
+    'Books',
+    'Bags',
+    'Other'
+];
 
 export default function AddItemScreen() {
     const [title, setTitle] = useState('');
@@ -12,12 +24,35 @@ export default function AddItemScreen() {
     const [category, setCategory] = useState('');
     const [location, setLocation] = useState('');
     const [status, setStatus] = useState('lost'); // 'lost' or 'found'
+    const [image, setImage] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
+    const resetForm = () => {
+        setTitle('');
+        setDescription('');
+        setCategory('');
+        setLocation('');
+        setStatus('lost');
+        setImage(null);
+    };
+
+    const pickImage = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.7,
+        });
+
+        if (!result.canceled) {
+            setImage(result.assets[0].uri);
+        }
+    };
+
     const handleSubmit = async () => {
         if (!title || !description || !category || !location) {
-            Alert.alert('Error', 'Please fill in all fields');
+            Alert.alert('Error', 'Please fill in all fields (Title, Description, Category, Location)');
             return;
         }
 
@@ -29,10 +64,19 @@ export default function AddItemScreen() {
                 category,
                 location,
                 status,
+                imageUrl: image, // In a real app, you'd upload this to a server/S3 first
             });
-            Alert.alert('Success', 'Item posted successfully');
-            router.replace('/(tabs)');
+            Alert.alert('Success', 'Item posted successfully', [
+                {
+                    text: 'OK',
+                    onPress: () => {
+                        resetForm();
+                        router.replace('/(tabs)');
+                    }
+                }
+            ]);
         } catch (error: any) {
+            console.error('Post Error:', error);
             Alert.alert('Error', error.response?.data?.message || 'Failed to post item');
         } finally {
             setLoading(false);
@@ -45,7 +89,7 @@ export default function AddItemScreen() {
                 <ThemedText type="title">Post Item</ThemedText>
             </View>
 
-            <ScrollView contentContainerStyle={styles.form}>
+            <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
                 <View style={styles.statusToggle}>
                     <TouchableOpacity
                         style={[styles.toggleButton, status === 'lost' && styles.activeLost]}
@@ -61,11 +105,23 @@ export default function AddItemScreen() {
                     </TouchableOpacity>
                 </View>
 
+                <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+                    {image ? (
+                        <Image source={{ uri: image }} style={styles.previewImage} />
+                    ) : (
+                        <View style={styles.imagePlaceholder}>
+                            <Ionicons name="camera-outline" size={40} color="#8E8E93" />
+                            <ThemedText style={styles.imagePlaceholderText}>Add Photo</ThemedText>
+                        </View>
+                    )}
+                </TouchableOpacity>
+
                 <View style={styles.inputContainer}>
                     <ThemedText style={styles.label}>Title</ThemedText>
                     <TextInput
                         style={styles.input}
                         placeholder="e.g. iPhone 13, BMW Keys"
+                        placeholderTextColor="#A0A0A0"
                         value={title}
                         onChangeText={setTitle}
                     />
@@ -73,12 +129,25 @@ export default function AddItemScreen() {
 
                 <View style={styles.inputContainer}>
                     <ThemedText style={styles.label}>Category</ThemedText>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="e.g. Electronics, Keys, Pets"
-                        value={category}
-                        onChangeText={setCategory}
-                    />
+                    <View style={styles.categoryContainer}>
+                        {CATEGORIES.map((cat) => (
+                            <TouchableOpacity
+                                key={cat}
+                                style={[
+                                    styles.categoryChip,
+                                    category === cat && styles.activeCategoryChip
+                                ]}
+                                onPress={() => setCategory(cat)}
+                            >
+                                <ThemedText style={[
+                                    styles.categoryText,
+                                    category === cat && styles.activeCategoryText
+                                ]}>
+                                    {cat}
+                                </ThemedText>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -86,6 +155,7 @@ export default function AddItemScreen() {
                     <TextInput
                         style={styles.input}
                         placeholder="e.g. Central Park, Library"
+                        placeholderTextColor="#A0A0A0"
                         value={location}
                         onChangeText={setLocation}
                     />
@@ -95,7 +165,8 @@ export default function AddItemScreen() {
                     <ThemedText style={styles.label}>Description</ThemedText>
                     <TextInput
                         style={[styles.input, styles.textArea]}
-                        placeholder="Provide more details to help identification..."
+                        placeholder="Provide more details to help identification (color, unique marks, etc...)"
+                        placeholderTextColor="#A0A0A0"
                         value={description}
                         onChangeText={setDescription}
                         multiline
@@ -130,21 +201,20 @@ const styles = StyleSheet.create({
     },
     form: {
         paddingHorizontal: 20,
-        paddingBottom: 100,
+        paddingBottom: 40,
         gap: 20,
     },
     statusToggle: {
         flexDirection: 'row',
         backgroundColor: '#F2F2F7',
-        borderRadius: 12,
+        borderRadius: 14,
         padding: 4,
-        marginBottom: 10,
     },
     toggleButton: {
         flex: 1,
         paddingVertical: 12,
         alignItems: 'center',
-        borderRadius: 8,
+        borderRadius: 10,
     },
     activeLost: {
         backgroundColor: '#FF3B30',
@@ -158,6 +228,29 @@ const styles = StyleSheet.create({
     },
     activeTabText: {
         color: '#FFF',
+    },
+    imagePicker: {
+        height: 180,
+        borderRadius: 16,
+        overflow: 'hidden',
+        backgroundColor: '#F2F2F7',
+        borderWidth: 1,
+        borderColor: '#E5E5EA',
+        borderStyle: 'dashed',
+    },
+    imagePlaceholder: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 8,
+    },
+    imagePlaceholderText: {
+        color: '#8E8E93',
+        fontSize: 14,
+    },
+    previewImage: {
+        width: '100%',
+        height: '100%',
     },
     inputContainer: {
         gap: 8,
@@ -174,8 +267,33 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#000',
     },
+    categoryContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    categoryChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#F2F2F7',
+        borderWidth: 1,
+        borderColor: '#E5E5EA',
+    },
+    activeCategoryChip: {
+        backgroundColor: '#007AFF',
+        borderColor: '#007AFF',
+    },
+    categoryText: {
+        fontSize: 13,
+        color: '#3A3A3C',
+    },
+    activeCategoryText: {
+        color: '#FFF',
+        fontWeight: '600',
+    },
     textArea: {
-        height: 120,
+        height: 100,
         textAlignVertical: 'top',
     },
     submitButton: {
@@ -185,6 +303,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 10,
+        shadowColor: '#007AFF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     submitButtonText: {
         color: '#FFF',

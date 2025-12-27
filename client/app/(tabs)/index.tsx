@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, FlatList, TouchableOpacity, RefreshControl, TextInput } from 'react-native';
+import { StyleSheet, View, FlatList, TouchableOpacity, RefreshControl, TextInput, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -48,24 +48,28 @@ export default function HomeScreen() {
       style={styles.card}
       onPress={() => router.push(`/item/${item._id}`)}
     >
-      <View style={styles.cardHeader}>
-        <ThemedText style={styles.category}>{item.category}</ThemedText>
-        <Ionicons
-          name={item.status === 'lost' ? 'alert-circle' : 'checkmark-circle'}
-          size={20}
-          color={item.status === 'lost' ? '#FF3B30' : '#34C759'}
-        />
-      </View>
-      <ThemedText type="subtitle" style={styles.itemTitle}>{item.title}</ThemedText>
-      <ThemedText numberOfLines={2} style={styles.description}>{item.description}</ThemedText>
-      <View style={styles.cardFooter}>
-        <View style={styles.locationContainer}>
-          <Ionicons name="location-outline" size={14} color="#8E8E93" />
-          <ThemedText style={styles.location}>{item.location}</ThemedText>
+      <View style={styles.cardContent}>
+        <View style={styles.textContainer}>
+          <View style={styles.cardHeader}>
+            <ThemedText style={styles.category}>{item.category}</ThemedText>
+            <Ionicons
+              name={item.status === 'lost' ? 'alert-circle' : 'checkmark-circle'}
+              size={18}
+              color={item.status === 'lost' ? '#FF3B30' : '#34C759'}
+            />
+          </View>
+          <ThemedText type="subtitle" style={styles.itemTitle} numberOfLines={1}>{item.title}</ThemedText>
+          <ThemedText numberOfLines={2} style={styles.description}>{item.description}</ThemedText>
+          <View style={styles.cardFooter}>
+            <View style={styles.locationContainer}>
+              <Ionicons name="location-outline" size={12} color="#8E8E93" />
+              <ThemedText style={styles.location}>{item.location}</ThemedText>
+            </View>
+          </View>
         </View>
-        <ThemedText style={styles.date}>
-          {new Date(item.createdAt).toLocaleDateString()}
-        </ThemedText>
+        {item.imageUrl && (
+          <Image source={{ uri: item.imageUrl }} style={styles.cardImage} />
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -202,41 +206,58 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 12,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 10,
-    elevation: 2,
+    elevation: 3,
     borderWidth: 1,
     borderColor: '#F2F2F7',
+  },
+  cardContent: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  textContainer: {
+    flex: 1,
+  },
+  cardImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    backgroundColor: '#F2F2F7',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   category: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#007AFF',
     fontWeight: 'bold',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   itemTitle: {
+    fontSize: 18,
     marginBottom: 4,
+    color: '#000',
   },
   description: {
     fontSize: 14,
-    opacity: 0.6,
-    lineHeight: 20,
-    marginBottom: 12,
+    color: '#8E8E93',
+    lineHeight: 18,
+    marginBottom: 8,
   },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 'auto',
   },
   locationContainer: {
     flexDirection: 'row',
@@ -244,10 +265,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   location: {
-    fontSize: 12,
-    color: '#8E8E93',
-  },
-  date: {
     fontSize: 12,
     color: '#8E8E93',
   },

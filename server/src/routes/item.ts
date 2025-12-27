@@ -1,5 +1,5 @@
 import express from 'express';
-import { createItem, getItems, getItemById, updateItemStatus, getMyItems } from '../controllers/itemController';
+import { createItem, getItems, getItemById, updateItemStatus, getMyItems, deleteItem } from '../controllers/itemController';
 import { protect } from '../middlewares/auth';
 
 const router = express.Router();
@@ -12,6 +12,7 @@ router.get('/me', protect, getMyItems);
 
 router.route('/:id')
     .get(getItemById)
-    .patch(protect, updateItemStatus);
+    .patch(protect, updateItemStatus)
+    .delete(protect, deleteItem);
 
 export default router;

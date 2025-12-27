@@ -148,3 +148,24 @@ export const getMyItems = async (req: AuthRequest, res: Response) => {
         res.status(500).json({ message: (error as Error).message });
     }
 };
+export const deleteItem = async (req: AuthRequest, res: Response) => {
+    try {
+        const db = getDb();
+        const collection = db.collection('items');
+
+        const item = await collection.findOne({ _id: new ObjectId(req.params.id) });
+
+        if (item) {
+            if (item.owner.toString() !== req.user.id) {
+                return res.status(401).json({ message: 'User not authorized' });
+            }
+
+            await collection.deleteOne({ _id: new ObjectId(req.params.id) });
+            res.json({ message: 'Item removed' });
+        } else {
+            res.status(404).json({ message: 'Item not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: (error as Error).message });
+    }
+};
