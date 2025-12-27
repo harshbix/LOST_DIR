@@ -25,7 +25,8 @@ export default function LoginScreen() {
             login(data, data.token);
             router.replace('/(tabs)');
         } catch (error: any) {
-            Alert.alert('Login Failed', error.response?.data?.message || 'Something went wrong');
+            console.error('Login Error:', error);
+            Alert.alert('Login Failed', error.response?.data?.message || error.message || 'Something went wrong');
         } finally {
             setLoading(false);
         }

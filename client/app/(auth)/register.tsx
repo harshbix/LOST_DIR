@@ -26,7 +26,8 @@ export default function RegisterScreen() {
             login(data, data.token);
             router.replace('/(tabs)');
         } catch (error: any) {
-            Alert.alert('Registration Failed', error.response?.data?.message || 'Something went wrong');
+            console.error('Registration Error:', error);
+            Alert.alert('Registration Failed', error.response?.data?.message || error.message || 'Something went wrong');
         } finally {
             setLoading(false);
         }
