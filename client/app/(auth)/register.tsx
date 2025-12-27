@@ -1,0 +1,136 @@
+import React, { useState } from 'react';
+import { StyleSheet, View, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { useAuth } from '@/context/AuthContext';
+import { registerUser } from '@/services/authService';
+
+export default function RegisterScreen() {
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const { login } = useAuth();
+    const router = useRouter();
+
+    const handleRegister = async () => {
+        if (!name || !email || !password) {
+            Alert.alert('Error', 'Please fill in all fields');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const data = await registerUser(name, email, password);
+            login(data, data.token);
+            router.replace('/(tabs)');
+        } catch (error: any) {
+            Alert.alert('Registration Failed', error.response?.data?.message || 'Something went wrong');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <ThemedView style={styles.container}>
+            <View style={styles.header}>
+                <ThemedText type="title">Create Account</ThemedText>
+                <ThemedText style={styles.subtitle}>Join the community today</ThemedText>
+            </View>
+
+            <View style={styles.form}>
+                <TextInput
+                    style={styles.input}
+                    placeholder="Full Name"
+                    placeholderTextColor="#A0A0A0"
+                    value={name}
+                    onChangeText={setName}
+                />
+                <TextInput
+                    style={styles.input}
+                    placeholder="Email"
+                    placeholderTextColor="#A0A0A0"
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                />
+                <TextInput
+                    style={styles.input}
+                    placeholder="Password"
+                    placeholderTextColor="#A0A0A0"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                />
+
+                <TouchableOpacity
+                    style={styles.button}
+                    onPress={handleRegister}
+                    disabled={loading}
+                >
+                    {loading ? (
+                        <ActivityIndicator color="#FFF" />
+                    ) : (
+                        <ThemedText style={styles.buttonText}>Sign Up</ThemedText>
+                    )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.linkButton}
+                    onPress={() => router.push('/(auth)/login')}
+                >
+                    <ThemedText style={styles.linkText}>Already have an account? Login</ThemedText>
+                </TouchableOpacity>
+            </View>
+        </ThemedView>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 24,
+        justifyContent: 'center',
+    },
+    header: {
+        marginBottom: 40,
+    },
+    subtitle: {
+        opacity: 0.6,
+        marginTop: 8,
+        fontSize: 16,
+    },
+    form: {
+        gap: 16,
+    },
+    input: {
+        height: 56,
+        backgroundColor: '#F5F5F5',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        fontSize: 16,
+        color: '#000',
+    },
+    button: {
+        backgroundColor: '#007AFF',
+        height: 56,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    buttonText: {
+        color: '#FFF',
+        fontSize: 18,
+        fontWeight: '600',
+    },
+    linkButton: {
+        alignItems: 'center',
+        marginTop: 16,
+    },
+    linkText: {
+        color: '#007AFF',
+    },
+});
