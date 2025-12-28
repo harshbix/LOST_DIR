@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { ObjectId } from 'mongodb';
 import { getDb } from '../config/db';
 
 const generateToken = (id: string) => {
@@ -70,7 +71,10 @@ export const login = async (req: Request, res: Response) => {
 export const getProfile = async (req: any, res: Response) => {
     try {
         const db = getDb();
-        const user = await db.collection('users').findOne({ _id: req.user.id });
+        const userId = req.user && req.user.id ? req.user.id : null;
+        if (!userId) return res.status(401).json({ message: 'Not authorized' });
+
+        const user = await db.collection('users').findOne({ _id: new ObjectId(userId) });
         if (user) {
             const { password, ...userData } = user;
             res.json(userData);
@@ -88,9 +92,12 @@ export const updateProfile = async (req: any, res: Response) => {
         const db = getDb();
         const collection = db.collection('users');
 
+        const userId = req.user && req.user.id ? req.user.id : null;
+        if (!userId) return res.status(401).json({ message: 'Not authorized' });
+
         // Check if email is already taken by another user
         if (email) {
-            const existingUser = await collection.findOne({ email, _id: { $ne: req.user.id } });
+            const existingUser = await collection.findOne({ email, _id: { $ne: new ObjectId(userId) } });
             if (existingUser) {
                 return res.status(400).json({ message: 'Email already taken' });
             }
@@ -101,13 +108,16 @@ export const updateProfile = async (req: any, res: Response) => {
         if (email) updateData.email = email;
 
         const result = await collection.findOneAndUpdate(
-            { _id: req.user.id },
+            { _id: new ObjectId(userId) },
             { $set: updateData },
             { returnDocument: 'after' }
         );
 
-        if (result) {
-            const { password, ...updatedUser } = result;
+        // Mongo returns an object { value, ok, ... }
+        const updated = result && (result as any).value ? (result as any).value : null;
+
+        if (updated) {
+            const { password, ...updatedUser } = updated;
             res.json(updatedUser);
         } else {
             res.status(404).json({ message: 'User not found' });

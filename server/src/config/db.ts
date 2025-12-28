@@ -6,8 +6,8 @@ dotenv.config();
 const url = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 const dbName = 'lostfound';
 
-let db: Db;
-let client: MongoClient;
+let db: Db | null = null;
+let client: MongoClient | null = null;
 
 const connectDB = async () => {
     try {
@@ -17,14 +17,17 @@ const connectDB = async () => {
         console.log(`MongoDB Native Driver Connected: ${url}`);
         return db;
     } catch (error) {
-        console.error(`Error: ${(error as Error).message}`);
-        process.exit(1);
+        console.error(`MongoDB connection failed: ${(error as Error).message}`);
+        console.error('Server will continue to run but database operations will return errors until connection is restored.');
+        // Do not exit process here so the API can start and return proper 5xx responses instead of crashing.
+        db = null;
+        return null;
     }
 };
 
 const getDb = () => {
     if (!db) {
-        throw new Error('Database not initialized. Call connectDB first.');
+        throw new Error('Database not initialized. Please ensure MongoDB is reachable and restart the server.');
     }
     return db;
 };
