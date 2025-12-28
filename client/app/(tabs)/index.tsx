@@ -7,7 +7,9 @@ import {
   RefreshControl,
   TextInput,
   Image,
-  ActivityIndicator
+  ActivityIndicator,
+  ScrollView,
+  Modal
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
@@ -15,18 +17,32 @@ import { ThemedView } from '@/components/themed-view';
 import { getItems } from '@/services/itemService';
 import { useAuth } from '@/context/AuthContext';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, Layout, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { Skeleton } from '@/components/Skeleton';
 
 export default function HomeScreen() {
+  const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'lost' | 'found'>('lost');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [sortBy, setSortBy] = useState('recent');
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+
+  const categories = ['all', 'electronics', 'documents', 'keys', 'clothing', 'wallets', 'pets', 'others'];
+  const sortOptions = [
+    { label: t('search.mostRecent'), value: 'recent', icon: 'time-outline' },
+    { label: t('search.oldestFirst'), value: 'oldest', icon: 'calendar-outline' },
+    { label: t('search.az'), value: 'az', icon: 'text-outline' },
+    { label: t('search.za'), value: 'za', icon: 'text-outline' },
+  ];
 
   const debouncedSearch = useDebounce(search, 400);
   const { user, token, isLoading: isAuthLoading } = useAuth();
@@ -37,6 +53,7 @@ export default function HomeScreen() {
   const borderColor = useThemeColor({}, 'border');
   const secondaryText = useThemeColor({}, 'secondaryText');
   const backgroundColor = useThemeColor({}, 'background');
+  const textColor = useThemeColor({}, 'text');
 
   // Auth Redirect
   useEffect(() => {
@@ -48,7 +65,15 @@ export default function HomeScreen() {
   const fetchItems = useCallback(async (isRefreshing = false) => {
     if (!isRefreshing) setLoading(true);
     try {
-      const data = await getItems({ status: activeTab, search: debouncedSearch });
+      const params: any = {
+        status: activeTab,
+        search: debouncedSearch,
+        sort: sortBy
+      };
+      if (selectedCategory !== 'all') {
+        params.category = selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1);
+      }
+      const data = await getItems(params);
       setItems(data);
     } catch (error) {
       console.error('Fetch items error:', error);
@@ -56,7 +81,7 @@ export default function HomeScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeTab, debouncedSearch]);
+  }, [activeTab, debouncedSearch, sortBy, selectedCategory]);
 
   useEffect(() => {
     fetchItems();
@@ -125,32 +150,79 @@ export default function HomeScreen() {
       <View style={[styles.searchBar, { backgroundColor: cardColor }]}>
         <Ionicons name="search" size={20} color={secondaryText} />
         <TextInput
-          style={[styles.searchInput, { color: useThemeColor({}, 'text') }]}
+          style={[styles.searchInput, { color: textColor }]}
           placeholder="Search items..."
           placeholderTextColor={secondaryText}
           value={search}
           onChangeText={setSearch}
         />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')}>
+            <Ionicons name="close-circle" size={18} color={secondaryText} />
+          </TouchableOpacity>
+        )}
       </View>
 
-      <View style={styles.tabs}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoriesScroll}
+      >
+        {categories.map((cat) => (
+          <TouchableOpacity
+            key={cat}
+            activeOpacity={0.7}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setSelectedCategory(cat);
+            }}
+            style={[
+              styles.categoryTab,
+              selectedCategory === cat ? { backgroundColor: tintColor } : { backgroundColor: cardColor }
+            ]}
+          >
+            <ThemedText style={[styles.categoryTabText, selectedCategory === cat ? styles.activeTabText : { color: secondaryText }]}>
+              {t(`search.categories.${cat}`)}
+            </ThemedText>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      <View style={{ height: 16 }} />
+
+
+      <View style={styles.filterRow}>
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[styles.miniTab, activeTab === 'lost' ? { backgroundColor: tintColor } : { backgroundColor: cardColor }]}
+            onPress={() => handleTabChange('lost')}
+          >
+            <ThemedText style={[styles.miniTabText, activeTab === 'lost' ? styles.activeTabText : { color: secondaryText }]}>{t('tabs.lost')}</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[styles.miniTab, activeTab === 'found' ? { backgroundColor: tintColor } : { backgroundColor: cardColor }]}
+            onPress={() => handleTabChange('found')}
+          >
+            <ThemedText style={[styles.miniTabText, activeTab === 'found' ? styles.activeTabText : { color: secondaryText }]}>{t('tabs.found')}</ThemedText>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity
-          activeOpacity={0.8}
-          style={[styles.tab, activeTab === 'lost' ? { backgroundColor: tintColor } : { backgroundColor: cardColor }]}
-          onPress={() => handleTabChange('lost')}
+          style={[styles.sortButton, { backgroundColor: cardColor }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setFilterModalVisible(true);
+          }}
         >
-          <ThemedText style={[styles.tabText, activeTab === 'lost' ? styles.activeTabText : { color: secondaryText }]}>Lost</ThemedText>
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={[styles.tab, activeTab === 'found' ? { backgroundColor: tintColor } : { backgroundColor: cardColor }]}
-          onPress={() => handleTabChange('found')}
-        >
-          <ThemedText style={[styles.tabText, activeTab === 'found' ? styles.activeTabText : { color: secondaryText }]}>Found</ThemedText>
+          <Ionicons name="options-outline" size={20} color={tintColor} />
+          <ThemedText style={styles.sortButtonText}>
+            {sortOptions.find(o => o.value === sortBy)?.label}
+          </ThemedText>
         </TouchableOpacity>
       </View>
     </View>
-  ), [user, search, activeTab, tintColor, cardColor, secondaryText]);
+  ), [user, search, activeTab, tintColor, cardColor, secondaryText, textColor]);
 
   return (
     <ThemedView style={styles.container}>
@@ -168,7 +240,19 @@ export default function HomeScreen() {
           ListEmptyComponent={
             loading ? (
               <View style={styles.centerContainer}>
-                <ActivityIndicator size="large" color={tintColor} />
+                {[1, 2, 3].map((i) => (
+                  <View key={i} style={[styles.skeletonCard, { backgroundColor: cardColor, borderColor }]}>
+                    <View style={styles.skeletonContent}>
+                      <View style={{ flex: 1 }}>
+                        <Skeleton width="40%" height={12} style={{ marginBottom: 12 }} />
+                        <Skeleton width="80%" height={24} style={{ marginBottom: 12 }} />
+                        <Skeleton width="90%" height={16} style={{ marginBottom: 8 }} />
+                        <Skeleton width="60%" height={16} />
+                      </View>
+                      <Skeleton width={96} height={96} borderRadius={16} />
+                    </View>
+                  </View>
+                ))}
               </View>
             ) : (
               <Animated.View entering={FadeIn} style={styles.emptyContainer}>
@@ -177,7 +261,52 @@ export default function HomeScreen() {
               </Animated.View>
             )
           }
+          initialNumToRender={6}
+          windowSize={5}
+          maxToRenderPerBatch={5}
+          removeClippedSubviews={true}
         />
+
+        <Modal
+          visible={filterModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setFilterModalVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setFilterModalVisible(false)}
+          >
+            <Animated.View
+              entering={FadeInDown}
+              style={[styles.modalContent, { backgroundColor: cardColor }]}
+            >
+              <ThemedText type="subtitle" style={styles.modalTitle}>{t('search.sortBy')}</ThemedText>
+              {sortOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.sortOption}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSortBy(option.value);
+                    setFilterModalVisible(false);
+                  }}
+                >
+                  <View style={styles.sortOptionLeft}>
+                    <Ionicons name={option.icon as any} size={20} color={sortBy === option.value ? tintColor : secondaryText} />
+                    <ThemedText style={[styles.sortLabel, sortBy === option.value && { color: tintColor, fontWeight: '700' }]}>
+                      {option.label}
+                    </ThemedText>
+                  </View>
+                  {sortBy === option.value && (
+                    <Ionicons name="checkmark" size={20} color={tintColor} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </Animated.View>
+          </TouchableOpacity>
+        </Modal>
 
         <Animated.View entering={FadeIn.delay(500)}>
           <TouchableOpacity
@@ -247,25 +376,64 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  tabs: {
-    flexDirection: 'row',
+  list: {
+    paddingBottom: 120,
+  },
+  categoriesScroll: {
     paddingHorizontal: 20,
-    marginBottom: 15,
-    gap: 12,
+    gap: 8,
+    marginBottom: 0,
+    paddingVertical: 4,
   },
-  tab: {
+  categoryTab: {
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    paddingHorizontal: 24,
     borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
-  tabText: {
-    fontWeight: '700',
+  categoryTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   activeTabText: {
     color: '#FFF',
   },
-  list: {
-    paddingBottom: 100,
+  filterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: '#00000010',
+    padding: 4,
+    borderRadius: 12,
+  },
+  miniTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  miniTabText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  sortButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   card: {
     borderRadius: 22,
@@ -332,7 +500,7 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 100,
     right: 30,
     width: 64,
     height: 64,
@@ -359,5 +527,50 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalTitle: {
+    marginBottom: 20,
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  sortOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#8E8E9330',
+  },
+  sortOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  sortLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  skeletonCard: {
+    borderRadius: 22,
+    padding: 16,
+    marginBottom: 16,
+    width: '100%',
+    borderWidth: 1,
+  },
+  skeletonContent: {
+    flexDirection: 'row',
+    gap: 16,
   },
 });

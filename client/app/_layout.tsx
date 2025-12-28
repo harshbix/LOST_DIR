@@ -10,6 +10,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { SplashScreen } from '@/components/SplashScreen';
 import { Colors } from '@/constants/theme';
+import { ThemeProvider as AppThemeProvider, useTheme } from '@/context/ThemeContext';
+import '@/i18n';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreenLibrary.preventAutoHideAsync();
@@ -19,7 +21,7 @@ export const unstable_settings = {
 };
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme() ?? 'light';
+  const { colorScheme } = useTheme();
   const { isLoading: isAuthLoading } = useAuth();
   const [appIsReady, setAppIsReady] = useState(false);
   const [splashVisible, setSplashVisible] = useState(true);
@@ -27,10 +29,15 @@ function RootLayoutNav() {
   useEffect(() => {
     async function prepare() {
       try {
-        // Wait for auth to load and a minimum delay for the splash animation
         if (!isAuthLoading) {
+          // Add a small artificial delay to ensure smooth transition
+          await new Promise(resolve => setTimeout(resolve, 500));
           setAppIsReady(true);
-          await SplashScreenLibrary.hideAsync();
+          try {
+            await SplashScreenLibrary.hideAsync();
+          } catch (e) {
+            // Ignore "No native splash screen" error
+          }
         }
       } catch (e) {
         console.warn(e);
@@ -49,7 +56,6 @@ function RootLayoutNav() {
       <View style={styles.container}>
         <Stack
           screenOptions={{
-            headerBackTitleVisible: false,
             headerShown: false,
             animation: 'fade_from_bottom',
             contentStyle: { backgroundColor: Colors[colorScheme].background }
@@ -91,9 +97,11 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
+    <AppThemeProvider>
+      <AuthProvider>
+        <RootLayoutNav />
+      </AuthProvider>
+    </AppThemeProvider>
   );
 }
 

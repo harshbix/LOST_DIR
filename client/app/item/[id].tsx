@@ -38,6 +38,8 @@ export default function ItemDetailsScreen() {
     const borderColor = useThemeColor({}, 'border');
     const secondaryText = useThemeColor({}, 'secondaryText');
     const tintColor = useThemeColor({}, 'tint');
+    const backgroundColor = useThemeColor({}, 'background');
+    const textColor = useThemeColor({}, 'text');
 
     const fetchItem = useCallback(async () => {
         try {
@@ -126,7 +128,7 @@ export default function ItemDetailsScreen() {
                     )}
                 </Animated.View>
 
-                <Animated.View entering={FadeInDown.delay(200)} style={[styles.content, { backgroundColor: useThemeColor({}, 'background') }]}>
+                <Animated.View entering={FadeInDown.delay(200)} style={[styles.content, { backgroundColor }]}>
                     <View style={styles.badgeRow}>
                         <View style={[styles.badge, { backgroundColor: item.status === 'lost' ? '#FF453A' : '#32D74B' }]}>
                             <ThemedText style={styles.badgeText}>{item.status.toUpperCase()}</ThemedText>
@@ -176,7 +178,7 @@ export default function ItemDetailsScreen() {
 
                     <View style={styles.section}>
                         <ThemedText style={styles.sectionTitle}>Details</ThemedText>
-                        <ThemedText style={[styles.description, { color: useThemeColor({}, 'text') }]}>{item.description}</ThemedText>
+                        <ThemedText style={[styles.description, { color: textColor }]}>{item.description}</ThemedText>
                     </View>
 
                     <View style={[styles.sectionDivider, { backgroundColor: borderColor }]} />
@@ -240,20 +242,38 @@ export default function ItemDetailsScreen() {
                                 </TouchableOpacity>
                             </View>
                         ) : (
-                            <TouchableOpacity
-                                activeOpacity={0.8}
-                                style={[styles.primaryButton, { backgroundColor: tintColor }, isRecovered && styles.disabledButton]}
-                                disabled={isRecovered}
-                                onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                    Alert.alert('Contact Owner', `You can reach ${item.owner?.name} at ${item.owner?.email}`);
-                                }}
-                            >
-                                <Ionicons name="mail" size={20} color="#FFF" />
-                                <ThemedText style={styles.buttonText}>
-                                    {isRecovered ? 'Item Case Closed' : 'Contact Owner'}
-                                </ThemedText>
-                            </TouchableOpacity>
+                            <View style={{ gap: 12 }}>
+                                <TouchableOpacity
+                                    activeOpacity={0.8}
+                                    style={[styles.primaryButton, { backgroundColor: tintColor }, isRecovered && styles.disabledButton]}
+                                    disabled={isRecovered}
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                        Alert.alert('Contact Owner', `You can reach ${item.owner?.name} at ${item.owner?.email}`);
+                                    }}
+                                >
+                                    <Ionicons name="mail" size={20} color="#FFF" />
+                                    <ThemedText style={styles.buttonText}>
+                                        {isRecovered ? 'Item Case Closed' : 'Contact Finder'}
+                                    </ThemedText>
+                                </TouchableOpacity>
+
+                                {!isRecovered && item.status === 'found' && (
+                                    <TouchableOpacity
+                                        activeOpacity={0.8}
+                                        style={[styles.secondaryButton, { borderColor: tintColor }]}
+                                        onPress={() => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                            router.push(`/claim/new?itemId=${id}` as any);
+                                        }}
+                                    >
+                                        <Ionicons name="hand-left" size={20} color={tintColor} />
+                                        <ThemedText style={[styles.secondaryButtonText, { color: tintColor }]}>
+                                            Claim This Item
+                                        </ThemedText>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
                         )}
                     </Animated.View>
                 </SafeAreaView>
@@ -469,5 +489,14 @@ const styles = StyleSheet.create({
     disabledButton: {
         backgroundColor: '#3A3A3C',
         shadowOpacity: 0,
+    },
+    secondaryButton: {
+        height: 64,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 10,
+        borderWidth: 2,
     },
 });

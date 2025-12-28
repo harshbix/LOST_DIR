@@ -1,38 +1,60 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Switch, Alert, Modal, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 
 export default function SettingsScreen() {
     const { logout, user } = useAuth();
     const router = useRouter();
-    const colorScheme = useColorScheme() ?? 'light';
+    const { t, i18n } = useTranslation();
+    const { theme, colorScheme, setTheme } = useTheme();
     const themeColors = Colors[colorScheme];
 
-    // Dummy states for UI toggles
+    const [langModalVisible, setLangModalVisible] = useState(false);
+    const [themeModalVisible, setThemeModalVisible] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-    const [darkMode, setDarkMode] = useState(colorScheme === 'dark');
 
-    const handleToggle = (setter: (v: boolean) => void, value: boolean) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        setter(!value);
+    const languages = [
+        { label: 'English', value: 'en' },
+        { label: 'Kiswahili', value: 'sw' }
+    ];
+
+    const themes = [
+        { label: t('common.system'), value: 'system' },
+        { label: t('common.light'), value: 'light' },
+        { label: t('common.dark'), value: 'dark' }
+    ];
+
+    const changeLanguage = async (lng: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        i18n.changeLanguage(lng);
+        await AsyncStorage.setItem('user-language', lng);
+        setLangModalVisible(false);
+    };
+
+    const changeTheme = (newTheme: 'light' | 'dark' | 'system') => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setTheme(newTheme);
+        setThemeModalVisible(false);
     };
 
     const handleLogout = () => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-            { text: 'Cancel', style: 'cancel' },
+        Alert.alert(t('common.logout'), 'Are you sure you want to sign out?', [
+            { text: t('common.cancel'), style: 'cancel' },
             {
-                text: 'Sign Out',
+                text: t('common.logout'),
                 style: 'destructive',
                 onPress: () => {
                     logout();
@@ -61,7 +83,7 @@ export default function SettingsScreen() {
     }) => (
         <TouchableOpacity
             activeOpacity={0.7}
-            style={[styles.row, isLast && styles.lastRow]}
+            style={[styles.row, isLast && styles.lastRow, { borderBottomColor: themeColors.border }]}
             onPress={onPress}
             disabled={type === 'switch'}
         >
@@ -72,12 +94,15 @@ export default function SettingsScreen() {
                 <ThemedText style={[styles.rowLabel, { color }]}>{label}</ThemedText>
             </View>
             <View style={styles.rowRight}>
-                {value && <ThemedText style={styles.rowValue}>{value}</ThemedText>}
+                {value && <ThemedText style={[styles.rowValue, { color: themeColors.secondaryText }]}>{value}</ThemedText>}
                 {type === 'chevron' && <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />}
                 {type === 'switch' && (
                     <Switch
                         value={notificationsEnabled}
-                        onValueChange={() => handleToggle(setNotificationsEnabled, notificationsEnabled)}
+                        onValueChange={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            setNotificationsEnabled(!notificationsEnabled);
+                        }}
                         trackColor={{ false: '#767577', true: themeColors.tint }}
                         thumbColor="#fff"
                     />
@@ -88,7 +113,7 @@ export default function SettingsScreen() {
 
     const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
         <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>{title.toUpperCase()}</ThemedText>
+            <ThemedText style={[styles.sectionTitle, { color: themeColors.secondaryText }]}>{title.toUpperCase()}</ThemedText>
             <View style={[styles.sectionContent, { backgroundColor: themeColors.card }]}>
                 {children}
             </View>
@@ -108,24 +133,34 @@ export default function SettingsScreen() {
                     >
                         <Ionicons name="chevron-back" size={24} color={themeColors.text} />
                     </TouchableOpacity>
-                    <ThemedText type="subtitle" style={styles.headerTitle}>Settings</ThemedText>
-                    <View style={{ width: 40 }} />
+                    <ThemedText type="subtitle" style={styles.headerTitle}>{t('common.settings')}</ThemedText>
+                    <View style={{ width: 44 }} />
                 </View>
 
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                     <Animated.View entering={FadeInDown.duration(400)}>
-                        <Section title="General">
-                            <SettingRow icon="language-outline" label="Language" value="English" />
-                            <SettingRow icon="moon-outline" label="Theme" value={colorScheme === 'dark' ? 'Dark' : 'Light'} />
+                        <Section title={t('common.settings')}>
+                            <SettingRow
+                                icon="language-outline"
+                                label={t('common.language')}
+                                value={i18n.language === 'en' ? 'English' : 'Kiswahili'}
+                                onPress={() => setLangModalVisible(true)}
+                            />
+                            <SettingRow
+                                icon="moon-outline"
+                                label={t('common.theme')}
+                                value={theme.charAt(0).toUpperCase() + theme.slice(1)}
+                                onPress={() => setThemeModalVisible(true)}
+                            />
                             <SettingRow icon="notifications-outline" label="Notifications" type="switch" isLast />
                         </Section>
 
-                        <Section title="Account & Privacy">
-                            <SettingRow icon="person-outline" label="Account Info" value={user?.name} />
-                            <SettingRow icon="lock-closed-outline" label="Privacy Controls" />
+                        <Section title={t('settings.accountPrivacy')}>
+                            <SettingRow icon="person-outline" label={t('common.account')} value={user?.name} onPress={() => router.push('/account-info')} />
+                            <SettingRow icon="lock-closed-outline" label={t('common.privacy')} onPress={() => router.push('/privacy-settings')} />
                             <SettingRow
                                 icon="log-out-outline"
-                                label="Sign Out"
+                                label={t('common.logout')}
                                 color="#FF453A"
                                 onPress={handleLogout}
                                 type="none"
@@ -133,18 +168,63 @@ export default function SettingsScreen() {
                             />
                         </Section>
 
-                        <Section title="Support">
-                            <SettingRow icon="help-circle-outline" label="Help / FAQ" />
-                            <SettingRow icon="mail-outline" label="Contact Support" />
-                            <SettingRow icon="information-circle-outline" label="About LOST_DIR" isLast />
+                        <Section title={t('settings.support')}>
+                            <SettingRow icon="help-circle-outline" label={t('common.help')} onPress={() => router.push('/faq')} />
+                            <SettingRow icon="information-circle-outline" label={t('common.about')} onPress={() => router.push('/about')} isLast />
                         </Section>
 
                         <View style={styles.footer}>
-                            <ThemedText style={styles.versionText}>LOST_DIR v1.0.0</ThemedText>
-                            <ThemedText style={styles.footerText}>Made with ❤️ for the community</ThemedText>
+                            <ThemedText style={[styles.versionText, { color: themeColors.secondaryText }]}>LOST_DIR {t('settings.version')}</ThemedText>
+                            <ThemedText style={[styles.footerText, { color: '#C7C7CC' }]}>{t('settings.footer')}</ThemedText>
                         </View>
                     </Animated.View>
                 </ScrollView>
+
+                {/* Language Modal */}
+                <Modal visible={langModalVisible} transparent animationType="fade">
+                    <TouchableOpacity
+                        style={styles.modalOverlay}
+                        activeOpacity={1}
+                        onPress={() => setLangModalVisible(false)}
+                    >
+                        <View style={[styles.modalContent, { backgroundColor: themeColors.card }]}>
+                            <ThemedText style={styles.modalTitle}>{t('common.language')}</ThemedText>
+                            {languages.map((l) => (
+                                <TouchableOpacity
+                                    key={l.value}
+                                    style={styles.modalOption}
+                                    onPress={() => changeLanguage(l.value)}
+                                >
+                                    <ThemedText style={[styles.optionLabel, i18n.language === l.value && { color: themeColors.tint }]}>{l.label}</ThemedText>
+                                    {i18n.language === l.value && <Ionicons name="checkmark" size={20} color={themeColors.tint} />}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </TouchableOpacity>
+                </Modal>
+
+                {/* Theme Modal */}
+                <Modal visible={themeModalVisible} transparent animationType="fade">
+                    <TouchableOpacity
+                        style={styles.modalOverlay}
+                        activeOpacity={1}
+                        onPress={() => setThemeModalVisible(false)}
+                    >
+                        <View style={[styles.modalContent, { backgroundColor: themeColors.card }]}>
+                            <ThemedText style={styles.modalTitle}>{t('common.theme')}</ThemedText>
+                            {themes.map((t_item) => (
+                                <TouchableOpacity
+                                    key={t_item.value}
+                                    style={styles.modalOption}
+                                    onPress={() => changeTheme(t_item.value as any)}
+                                >
+                                    <ThemedText style={[styles.optionLabel, theme === t_item.value && { color: themeColors.tint }]}>{t_item.label}</ThemedText>
+                                    {theme === t_item.value && <Ionicons name="checkmark" size={20} color={themeColors.tint} />}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </TouchableOpacity>
+                </Modal>
             </SafeAreaView>
         </ThemedView>
     );
@@ -158,18 +238,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 15,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
     },
     backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         justifyContent: 'center',
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '800',
     },
     scrollContent: {
@@ -182,7 +262,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#8E8E93',
         marginBottom: 8,
         marginLeft: 12,
     },
@@ -197,7 +276,6 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         paddingHorizontal: 16,
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: 'rgba(142, 142, 147, 0.2)',
     },
     lastRow: {
         borderBottomWidth: 0,
@@ -225,7 +303,6 @@ const styles = StyleSheet.create({
     },
     rowValue: {
         fontSize: 15,
-        color: '#8E8E93',
     },
     footer: {
         marginTop: 40,
@@ -235,10 +312,35 @@ const styles = StyleSheet.create({
     versionText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#8E8E93',
     },
     footerText: {
         fontSize: 12,
-        color: '#C7C7CC',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        width: '80%',
+        borderRadius: 24,
+        padding: 24,
+        gap: 16,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        marginBottom: 8,
+    },
+    modalOption: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+    },
+    optionLabel: {
+        fontSize: 17,
+        fontWeight: '600',
     },
 });

@@ -66,3 +66,53 @@ export const login = async (req: Request, res: Response) => {
         res.status(500).json({ message: (error as Error).message });
     }
 };
+
+export const getProfile = async (req: any, res: Response) => {
+    try {
+        const db = getDb();
+        const user = await db.collection('users').findOne({ _id: req.user.id });
+        if (user) {
+            const { password, ...userData } = user;
+            res.json(userData);
+        } else {
+            res.status(404).json({ message: 'User not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: (error as Error).message });
+    }
+};
+
+export const updateProfile = async (req: any, res: Response) => {
+    try {
+        const { name, email } = req.body;
+        const db = getDb();
+        const collection = db.collection('users');
+
+        // Check if email is already taken by another user
+        if (email) {
+            const existingUser = await collection.findOne({ email, _id: { $ne: req.user.id } });
+            if (existingUser) {
+                return res.status(400).json({ message: 'Email already taken' });
+            }
+        }
+
+        const updateData: any = { updatedAt: new Date() };
+        if (name) updateData.name = name;
+        if (email) updateData.email = email;
+
+        const result = await collection.findOneAndUpdate(
+            { _id: req.user.id },
+            { $set: updateData },
+            { returnDocument: 'after' }
+        );
+
+        if (result) {
+            const { password, ...updatedUser } = result;
+            res.json(updatedUser);
+        } else {
+            res.status(404).json({ message: 'User not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: (error as Error).message });
+    }
+};

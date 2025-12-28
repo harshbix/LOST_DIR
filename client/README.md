@@ -2,6 +2,15 @@
 
 The mobile client for the Lost & Found application, built with Expo and TypeScript.
 
+## Key Features
+- **Lost & Found Feed**: Browse items with advanced filtering (Category, Date, Location).
+- **Interactive Map**: View item locations (Coming Soon).
+- **Trust & Safety**: 
+  - **Police Loss Reports**: Upload and securely store official loss reports (RB).
+  - **Smart Claims**: Claim found items by verifying against your stored loss reports.
+  - **Confidence Scoring**: Automatic matching algorithm to assist owners and finders.
+- **Multilingual**: Full support for English and Kiswahili.
+
 ## Setup
 1. Install dependencies:
    ```bash
@@ -13,19 +22,18 @@ The mobile client for the Lost & Found application, built with Expo and TypeScri
    ```
 
 ## Folder Structure
-- `app/`: Expo Router screens and layouts.
-- `components/`: Reusable UI components.
+- `app/`:
+  - `(tabs)/`: Main tab navigation (Home, Profile, Add).
+  - `loss-report/`: Screens for managing Police Loss Reports.
+  - `claims/`: Screens for managing item claims.
+  - `claim/`: Flow for creating a new claim.
+  - `item/`: Detailed item view.
+- `components/`: Reusable UI components (TrustGuidance, Skeleton, Themed components).
 - `context/`: Authentication and global state.
-- `services/`: API communication layers.
-- `constants/`: App configuration and theme.
-- `hooks/`: Custom React hooks.
-- `utils/`: Helper functions.
+- `services/`: API communication layers (Item, Trust, Auth).
+- `i18n/`: Localization files (en, sw).
 
-## Navigation
-- `welcome`: Onboarding screen.
-- `(auth)/login`: Login screen.
-- `(auth)/register`: Sign up screen.
-- `(tabs)/index`: Home discovery screen.
-- `(tabs)/add`: Post new item screen.
-- `(tabs)/profile`: User profile and posts.
-- `item/[id]`: Detailed item view.
+## Navigation Flows
+- **Discovery**: Home -> Item Details -> Claim (if item is found).
+- **Reporting**: Profile -> Police Reports -> New Report.
+- **Recovery**: Profile -> Claims -> View Claim Status -> Chat/Return.

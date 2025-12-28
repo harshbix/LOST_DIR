@@ -109,6 +109,7 @@ export default function AddItemScreen() {
     const borderColor = useThemeColor({}, 'border');
     const secondaryText = useThemeColor({}, 'secondaryText');
     const textColor = useThemeColor({}, 'text');
+    const backgroundColor = useThemeColor({}, 'background');
 
     const submitBtnScale = useSharedValue(1);
     const animatedSubmitStyle = useAnimatedStyle(() => ({
@@ -366,7 +367,7 @@ export default function AddItemScreen() {
                                     <Animated.View
                                         entering={FadeInUp.springify()}
                                         exiting={FadeOutUp}
-                                        style={[styles.suggestionsWrapper, { backgroundColor: useThemeColor({}, 'background'), borderColor }]}
+                                        style={[styles.suggestionsWrapper, { backgroundColor, borderColor }]}
                                     >
                                         <FlatList
                                             data={suggestions}
@@ -429,7 +430,7 @@ const styles = StyleSheet.create({
     },
     form: {
         paddingHorizontal: 20,
-        paddingBottom: 60,
+        paddingBottom: 140,
         gap: 24,
     },
     statusToggle: {

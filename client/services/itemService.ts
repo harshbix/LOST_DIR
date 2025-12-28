@@ -1,6 +1,12 @@
 import api from './api';
 
-export const getItems = async (params?: { status?: string; category?: string; search?: string }) => {
+export const getItems = async (params?: {
+    status?: string;
+    category?: string;
+    search?: string;
+    sort?: string;
+    sortBy?: string;
+}) => {
     const response = await api.get('/items', { params });
     return response.data;
 };

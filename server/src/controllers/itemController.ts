@@ -32,7 +32,7 @@ export const createItem = async (req: AuthRequest, res: Response) => {
 
 export const getItems = async (req: Request, res: Response) => {
     try {
-        const { status, category, search } = req.query;
+        const { status, category, search, sort, sortBy } = req.query;
         let query: any = {};
 
         if (status) query.status = status;
@@ -41,8 +41,15 @@ export const getItems = async (req: Request, res: Response) => {
             query.$or = [
                 { title: { $regex: search, $options: 'i' } },
                 { description: { $regex: search, $options: 'i' } },
+                { location: { $regex: search, $options: 'i' } },
             ];
         }
+
+        let sortQuery: any = { createdAt: -1 };
+        if (sort === 'oldest') sortQuery = { createdAt: 1 };
+        if (sort === 'az') sortQuery = { title: 1 };
+        if (sort === 'za') sortQuery = { title: -1 };
+        if (sortBy === 'updated') sortQuery = { updatedAt: -1 };
 
         const db = getDb();
         const items = await db.collection('items')
@@ -62,7 +69,7 @@ export const getItems = async (req: Request, res: Response) => {
                         'ownerInfo.password': 0,
                     }
                 },
-                { $sort: { createdAt: -1 } }
+                { $sort: sortQuery }
             ]).toArray();
 
         // Map ownerInfo to owner to match client expectation

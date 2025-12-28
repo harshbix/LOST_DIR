@@ -108,7 +108,29 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.section}>
+                <View style={styles.menuGrid}>
+                    <TouchableOpacity
+                        style={[styles.menuItem, { backgroundColor: cardColor }]}
+                        onPress={() => router.push('/loss-report' as any)}
+                    >
+                        <View style={[styles.menuIcon, { backgroundColor: '#FF950015' }]}>
+                            <Ionicons name="document-text" size={24} color="#FF9500" />
+                        </View>
+                        <ThemedText style={styles.menuLabel}>Police Reports</ThemedText>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.menuItem, { backgroundColor: cardColor }]}
+                        onPress={() => router.push('/claims' as any)}
+                    >
+                        <View style={[styles.menuIcon, { backgroundColor: '#32D74B15' }]}>
+                            <Ionicons name="hand-left" size={24} color="#32D74B" />
+                        </View>
+                        <ThemedText style={styles.menuLabel}>Claims</ThemedText>
+                    </TouchableOpacity>
+                </View>
+
+                <View style={[styles.section, { flex: 1 }]}>
                     <View style={styles.sectionHeader}>
                         <ThemedText style={styles.sectionTitle}>My Activity</ThemedText>
                         <View style={[styles.countBadge, { backgroundColor: cardColor }]}>
@@ -232,7 +254,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     list: {
-        paddingBottom: 40,
+        paddingBottom: 120,
         gap: 12,
     },
     itemCard: {
@@ -302,5 +324,29 @@ const styles = StyleSheet.create({
     createNowText: {
         fontWeight: '700',
         fontSize: 16,
+    },
+    menuGrid: {
+        flexDirection: 'row',
+        gap: 16,
+        paddingHorizontal: 24,
+        marginBottom: 32,
+    },
+    menuItem: {
+        flex: 1,
+        padding: 16,
+        borderRadius: 20,
+        gap: 12,
+        alignItems: 'center',
+    },
+    menuIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    menuLabel: {
+        fontSize: 14,
+        fontWeight: '700',
     }
 });
