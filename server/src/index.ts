@@ -17,7 +17,13 @@ const PORT = process.env.PORT || 5000;
 // Connect to Database and Start Server
 const startServer = async () => {
     try {
-        await connectDB();
+        try {
+            await connectDB();
+        } catch (dbErr) {
+            console.error('Warning: could not connect to MongoDB:', (dbErr as Error).message || dbErr);
+            console.error('Continuing to start server; DB operations will fail until connection is restored.');
+        }
+
         app.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);
         });

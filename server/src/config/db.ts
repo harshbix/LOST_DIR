@@ -4,25 +4,30 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const url = process.env.MONGODB_URI || 'mongodb://localhost:27017';
-const dbName = 'lostfound';
+const dbName = process.env.MONGODB_DB || 'lostandfound';
 
 let db: Db | null = null;
 let client: MongoClient | null = null;
 
-const connectDB = async () => {
-    try {
-        client = new MongoClient(url);
-        await client.connect();
-        db = client.db(dbName);
-        console.log(`MongoDB Native Driver Connected: ${url}`);
-        return db;
-    } catch (error) {
-        console.error(`MongoDB connection failed: ${(error as Error).message}`);
-        console.error('Server will continue to run but database operations will return errors until connection is restored.');
-        // Do not exit process here so the API can start and return proper 5xx responses instead of crashing.
-        db = null;
-        return null;
+const connectDB = async (retries = 5, delayMs = 2000) => {
+    let attempt = 0;
+    while (attempt < retries) {
+        try {
+            client = new MongoClient(url);
+            await client.connect();
+            db = client.db(dbName);
+            console.log(`MongoDB Native Driver Connected: ${url}/${dbName}`);
+            return db;
+        } catch (error) {
+            attempt++;
+            console.error(`MongoDB connection attempt ${attempt} failed: ${(error as Error).message}`);
+            if (attempt >= retries) {
+                throw error;
+            }
+            await new Promise((r) => setTimeout(r, delayMs));
+        }
     }
+    throw new Error('Failed to connect to MongoDB');
 };
 
 const getDb = () => {
